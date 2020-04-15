@@ -2,7 +2,7 @@
 
 ### Rapbserry Pi crontab -e
 ```
-* * * * * python3 /home/pi/dht22.py
+*/5 * * * * python3 /home/pi/dht22.py > /dev/null 2>&1
 ```
 
 ### Build telegram bot for ARM arch

@@ -1,5 +1,6 @@
 import Adafruit_DHT
 import mysql.connector
+import sys
 from datetime import date, datetime
 
 DHT_SENSOR = Adafruit_DHT.DHT22
@@ -15,6 +16,10 @@ cursor = db.cursor()
 created = datetime.now()
 
 h, t = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
+
+if h < 10.0:
+    sys.exit()
+
 sql = "INSERT INTO measurements (created_at, temperature, humidity) VALUES (%s, %s, %s)"
 val = (created, round(t, 2), round(h, 2))
 cursor.execute(sql, val)
