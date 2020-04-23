@@ -12,8 +12,8 @@ $ GOOS=linux GOARCH=arm GOARM=5 go build .
 ```
 
 ### Bot commands
-* /last - presents last measurement
-* /day - render graph with measurements during last 24 hours
+* last - presents last measurement
+* day - render graph with measurements during last 24 hours
 
 ### Example
 ![](output.png)
