@@ -42,7 +42,16 @@ func main() {
 	bot := tbot.New(os.Getenv("TELEGRAM_TOKEN"))
 	c := bot.Client()
 
-	bot.HandleMessage("/last", func(m *tbot.Message) {
+	bot.HandleMessage("/", func(m *tbot.Message) {
+		c.SendChatAction(m.Chat.ID, tbot.ActionTyping)
+		time.Sleep(1 * time.Second)
+		markup := tbot.Buttons([][]string{
+			{"last", "day"},
+		})
+		c.SendMessage(m.Chat.ID, "Pick an option:", tbot.OptReplyKeyboardMarkup(markup))
+	})
+
+	bot.HandleMessage("last", func(m *tbot.Message) {
 		c.SendChatAction(m.Chat.ID, tbot.ActionTyping)
 		time.Sleep(1 * time.Second)
 		measurement := new(Measurement)
@@ -63,7 +72,7 @@ func main() {
 		c.SendMessage(m.Chat.ID, msg)
 	})
 
-	bot.HandleMessage("/day", func(m *tbot.Message) {
+	bot.HandleMessage("day", func(m *tbot.Message) {
 		c.SendChatAction(m.Chat.ID, tbot.ActionTyping)
 		time.Sleep(1 * time.Second)
 
