@@ -16,5 +16,24 @@ $ GOOS=linux GOARCH=arm GOARM=5 go build .
 * last - presents last measurement
 * day - renders graph with measurements during last 24 hours
 
+### Systemd service `/lib/systemd/system/atmohome.service`
+```ini
+[Unit]
+Description=Atmohome
+DefaultDependencies=no
+After=network.target
+
+[Service]
+WorkingDirectory=/home/pi
+Type=simple
+RemainAfterExit=yes
+ExecStart=/home/pi/atmohome
+Restart=on-failure
+RestartSec=30s
+
+[Install]
+WantedBy=multi-user.target
+```
+
 ### Example
 ![](output.png)

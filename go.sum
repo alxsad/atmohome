@@ -14,8 +14,8 @@ github.com/opentracing/opentracing-go v1.0.2/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFSt
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/wcharczuk/go-chart v2.0.2-0.20190910040548-3a7bc5543113+incompatible h1:Bz/7IMIv+MmCANT7drP8zyxHH5xHC0/+smWpcJCCk4M=
 github.com/wcharczuk/go-chart v2.0.2-0.20190910040548-3a7bc5543113+incompatible/go.mod h1:PF5tmL4EIx/7Wf+hEkpCqYi5He4u90sw+0+6FhrryuE=
-github.com/yanzay/tbot/v2 v2.1.0 h1:mppieSOIbzaCjp2en66Fz4unIJ57+aalQfdGbtYmaKg=
-github.com/yanzay/tbot/v2 v2.1.0/go.mod h1:q0+8JblBq9tLAnKHdBIZsHwDvMS9TfO6mNfaAk1VrHg=
+github.com/yanzay/tbot/v2 v2.2.0 h1:bK1+XTwY59IskXpwtHc/ItfU2uELTTqYP3pajfBaPeM=
+github.com/yanzay/tbot/v2 v2.2.0/go.mod h1:q0+8JblBq9tLAnKHdBIZsHwDvMS9TfO6mNfaAk1VrHg=
 golang.org/x/image v0.0.0-20200119044424-58c23975cae1 h1:5h3ngYt7+vXCDZCup/HkCQgW5XwmSvR/nA2JmJ0RErg=
 golang.org/x/image v0.0.0-20200119044424-58c23975cae1/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
 golang.org/x/net v0.0.0-20181201002055-351d144fa1fc/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
