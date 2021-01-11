@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/wcharczuk/go-chart"
 	"github.com/yanzay/tbot/v2"
 )
@@ -27,7 +28,7 @@ func main() {
 	err := godotenv.Load()
 	checkErr(err)
 
-	db, err := sql.Open("mysql", os.Getenv("DATABASE_URL"))
+	db, err := sql.Open("sqlite3", os.Getenv("DATABASE_URL"))
 	checkErr(err)
 
 	err = db.Ping()
@@ -71,7 +72,7 @@ func main() {
 	bot.HandleMessage("day", func(m *tbot.Message) {
 		c.SendChatAction(m.Chat.ID, tbot.ActionTyping)
 		time.Sleep(1 * time.Second)
-		rows, err := db.Query("SELECT created_at, temperature, humidity FROM measurements WHERE created_at >= now() - INTERVAL 1 DAY")
+		rows, err := db.Query("SELECT created_at, temperature, humidity FROM measurements WHERE created_at >= datetime('now', '-1 day')")
 		checkErr(err)
 		defer rows.Close()
 		var temperatures []float64
@@ -158,6 +159,21 @@ func startAPIServer(db *sql.DB, listen string) {
 			return
 		}
 		fmt.Fprint(w, "OK")
+	})
+	http.HandleFunc("/rows", func(w http.ResponseWriter, r *http.Request) {
+		rows, err := db.Query("SELECT created_at, temperature, humidity FROM measurements WHERE created_at >= datetime('now', '-1 day')")
+		checkErr(err)
+		defer rows.Close()
+		result := []Measurement{}
+		for rows.Next() {
+			measurement := Measurement{}
+			err := rows.Scan(&measurement.CreatedAt, &measurement.Temperature, &measurement.Humidity)
+			checkErr(err)
+			result = append(result, measurement)
+		}
+		b, err := json.Marshal(result)
+		checkErr(err)
+		fmt.Fprint(w, string(b))
 	})
 	fmt.Printf("Starting server at: %s\n", listen)
 	if err := http.ListenAndServe(listen, nil); err != nil {

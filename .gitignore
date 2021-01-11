@@ -1,4 +1,5 @@
 .idea
 .vscode
 atmohome
+atmohome.db
 .env

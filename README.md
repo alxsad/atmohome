@@ -8,7 +8,7 @@
 ### Build telegram bot for ARM arch
 ```bash
 $ go mod download
-$ GOOS=linux GOARCH=arm GOARM=5 go build .
+$ GOOS=linux GOARCH=arm GOARM=5 CGO_ENABLED=1 go build -v -o atmohome main.go
 ```
 
 ### Bot commands
