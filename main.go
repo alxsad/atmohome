@@ -21,6 +21,9 @@ type Measurement struct {
 	CreatedAt   time.Time `json:"created_at"`
 	Temperature float64   `json:"temperature"`
 	Humidity    float64   `json:"humidity"`
+	Pressure    float64   `json:"pressure"`
+	Altitude    float64   `json:"altittude"`
+	Vcc         float64   `json:"vcc"`
 }
 
 func main() {
@@ -41,50 +44,67 @@ func main() {
 	bot := tbot.New(os.Getenv("TELEGRAM_TOKEN"))
 	c := bot.Client()
 
-	bot.HandleMessage("/", func(m *tbot.Message) {
-		c.SendChatAction(m.Chat.ID, tbot.ActionTyping)
-		time.Sleep(1 * time.Second)
+	bot.HandleMessage("/", func(msg *tbot.Message) {
+		c.SendChatAction(msg.Chat.ID, tbot.ActionTyping)
 		markup := tbot.Buttons([][]string{
-			{"last", "day"},
+			{"last", "day", "vcc"},
 		})
-		c.SendMessage(m.Chat.ID, "Pick an option:", tbot.OptReplyKeyboardMarkup(markup))
+		c.SendMessage(msg.Chat.ID, "Pick an option:", tbot.OptReplyKeyboardMarkup(markup))
 	})
 
-	bot.HandleMessage("last", func(m *tbot.Message) {
-		c.SendChatAction(m.Chat.ID, tbot.ActionTyping)
-		time.Sleep(1 * time.Second)
-		measurement := new(Measurement)
-		row := db.QueryRow("SELECT created_at, temperature, humidity FROM measurements ORDER BY created_at DESC LIMIT 1")
-		err = row.Scan(&measurement.CreatedAt, &measurement.Temperature, &measurement.Humidity)
+	bot.HandleMessage("last", func(msg *tbot.Message) {
+		c.SendChatAction(msg.Chat.ID, tbot.ActionTyping)
+		m := new(Measurement)
+		row := db.QueryRow("SELECT created_at, temperature, humidity, pressure, altitude FROM measurements ORDER BY created_at DESC LIMIT 1")
+		err = row.Scan(&m.CreatedAt, &m.Temperature, &m.Humidity, &m.Pressure, &m.Altitude)
 		if err == sql.ErrNoRows {
-			c.SendMessage(m.Chat.ID, "No mesaurements :(")
+			c.SendMessage(msg.Chat.ID, "No mesaurements :(")
 		}
 		checkErr(err)
-		msg := fmt.Sprintf(
-			"[%s]   %.1f°C   %.1f%%",
-			measurement.CreatedAt.Format("15:04 Jan _2"),
-			measurement.Temperature,
-			measurement.Humidity,
+		response := fmt.Sprintf(
+			"[%s]  %.1f°C  %.1f%%  %.1f Pa",
+			m.CreatedAt.Format("15:04 Jan _2"),
+			m.Temperature,
+			m.Humidity,
+			m.Pressure,
 		)
-		c.SendMessage(m.Chat.ID, msg)
+		c.SendMessage(msg.Chat.ID, response)
 	})
 
-	bot.HandleMessage("day", func(m *tbot.Message) {
-		c.SendChatAction(m.Chat.ID, tbot.ActionTyping)
-		time.Sleep(1 * time.Second)
-		rows, err := db.Query("SELECT created_at, temperature, humidity FROM measurements WHERE created_at >= datetime('now', '-1 day')")
+	bot.HandleMessage("vcc", func(msg *tbot.Message) {
+		c.SendChatAction(msg.Chat.ID, tbot.ActionTyping)
+		m := new(Measurement)
+		row := db.QueryRow("SELECT created_at, vcc FROM measurements ORDER BY created_at DESC LIMIT 1")
+		err = row.Scan(&m.CreatedAt, &m.Vcc)
+		if err == sql.ErrNoRows {
+			c.SendMessage(msg.Chat.ID, "No VCC :(")
+		}
+		checkErr(err)
+		response := fmt.Sprintf(
+			"[%s] %.2f",
+			m.CreatedAt.Format("15:04 Jan _2"),
+			m.Vcc,
+		)
+		c.SendMessage(msg.Chat.ID, response)
+	})
+
+	bot.HandleMessage("day", func(msg *tbot.Message) {
+		c.SendChatAction(msg.Chat.ID, tbot.ActionTyping)
+		rows, err := db.Query("SELECT created_at, temperature, humidity, pressure FROM measurements WHERE created_at >= datetime('now', '-1 day')")
 		checkErr(err)
 		defer rows.Close()
 		var temperatures []float64
 		var humidities []float64
+		var pressures []float64
 		var dates []time.Time
 		for rows.Next() {
-			measurement := new(Measurement)
-			err := rows.Scan(&measurement.CreatedAt, &measurement.Temperature, &measurement.Humidity)
+			m := new(Measurement)
+			err := rows.Scan(&m.CreatedAt, &m.Temperature, &m.Humidity, &m.Pressure)
 			checkErr(err)
-			dates = append(dates, measurement.CreatedAt)
-			temperatures = append(temperatures, measurement.Temperature)
-			humidities = append(humidities, measurement.Humidity)
+			dates = append(dates, m.CreatedAt)
+			temperatures = append(temperatures, m.Temperature)
+			humidities = append(humidities, m.Humidity)
+			pressures = append(pressures, m.Pressure)
 		}
 
 		graph := chart.Chart{
@@ -104,6 +124,11 @@ func main() {
 					XValues: dates,
 					YValues: humidities,
 				},
+				chart.TimeSeries{
+					Name:    "Pressure",
+					XValues: dates,
+					YValues: pressures,
+				},
 			},
 		}
 		graph.Elements = []chart.Renderable{
@@ -114,7 +139,7 @@ func main() {
 		defer f.Close()
 		err = graph.Render(chart.PNG, f)
 
-		_, err = c.SendPhotoFile(m.Chat.ID, "output.png", tbot.OptCaption("Last 24 hours graph"))
+		_, err = c.SendPhotoFile(msg.Chat.ID, "output.png", tbot.OptCaption("Last 24 hours graph"))
 		checkErr(err)
 	})
 
@@ -137,6 +162,7 @@ func formatTime(v interface{}, dateFormat string) string {
 
 func startAPIServer(db *sql.DB, listen string) {
 	http.HandleFunc("/dht22", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("New measurement:", r.URL.Query())
 		t, err := strconv.ParseFloat(r.FormValue("t"), 64)
 		if err != nil {
 			httpErr("Can not parse temperature", 400, w)
@@ -147,13 +173,28 @@ func startAPIServer(db *sql.DB, listen string) {
 			httpErr("Can not parse humidity", 400, w)
 			return
 		}
-		sql := "INSERT INTO measurements(created_at, temperature, humidity) values (?, ?, ?)"
+		p, err := strconv.ParseFloat(r.FormValue("p"), 64)
+		if err != nil {
+			httpErr("Can not parse pressure", 400, w)
+			return
+		}
+		a, err := strconv.ParseFloat(r.FormValue("a"), 64)
+		if err != nil {
+			httpErr("Can not parse altitude", 400, w)
+			return
+		}
+		v, err := strconv.ParseFloat(r.FormValue("v"), 64)
+		if err != nil {
+			httpErr("Can not parse VCC", 400, w)
+			return
+		}
+		sql := "INSERT INTO measurements(created_at, temperature, humidity, pressure, altitude, vcc) values (?, ?, ?, ?, ?, ?)"
 		stmt, err := db.Prepare(sql)
 		if err != nil {
 			httpErr("Can not create sql statement", 500, w)
 			return
 		}
-		_, err = stmt.Exec(time.Now(), t, h)
+		_, err = stmt.Exec(time.Now(), t, h, p, a, v/1000)
 		if err != nil {
 			httpErr("Can not insert values into database", 500, w)
 			return
@@ -161,15 +202,15 @@ func startAPIServer(db *sql.DB, listen string) {
 		fmt.Fprint(w, "OK")
 	})
 	http.HandleFunc("/rows", func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query("SELECT created_at, temperature, humidity FROM measurements WHERE created_at >= datetime('now', '-1 day')")
+		rows, err := db.Query("SELECT created_at, temperature, humidity, pressure, altitude, vcc FROM measurements WHERE created_at >= datetime('now', '-1 day')")
 		checkErr(err)
 		defer rows.Close()
 		result := []Measurement{}
 		for rows.Next() {
-			measurement := Measurement{}
-			err := rows.Scan(&measurement.CreatedAt, &measurement.Temperature, &measurement.Humidity)
+			m := Measurement{}
+			err := rows.Scan(&m.CreatedAt, &m.Temperature, &m.Humidity, &m.Pressure, &m.Altitude, &m.Vcc)
 			checkErr(err)
-			result = append(result, measurement)
+			result = append(result, m)
 		}
 		b, err := json.Marshal(result)
 		checkErr(err)
