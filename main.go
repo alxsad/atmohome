@@ -47,7 +47,7 @@ func main() {
 	bot.HandleMessage("/", func(msg *tbot.Message) {
 		c.SendChatAction(msg.Chat.ID, tbot.ActionTyping)
 		markup := tbot.Buttons([][]string{
-			{"last", "day", "vcc"},
+			{"last", "day", "pressure", "vcc"},
 		})
 		c.SendMessage(msg.Chat.ID, "Pick an option:", tbot.OptReplyKeyboardMarkup(markup))
 	})
@@ -90,21 +90,19 @@ func main() {
 
 	bot.HandleMessage("day", func(msg *tbot.Message) {
 		c.SendChatAction(msg.Chat.ID, tbot.ActionTyping)
-		rows, err := db.Query("SELECT created_at, temperature, humidity, pressure FROM measurements WHERE created_at >= datetime('now', '-1 day')")
+		rows, err := db.Query("SELECT created_at, temperature, humidity FROM measurements WHERE created_at >= datetime('now', '-1 day')")
 		checkErr(err)
 		defer rows.Close()
 		var temperatures []float64
 		var humidities []float64
-		var pressures []float64
 		var dates []time.Time
 		for rows.Next() {
 			m := new(Measurement)
-			err := rows.Scan(&m.CreatedAt, &m.Temperature, &m.Humidity, &m.Pressure)
+			err := rows.Scan(&m.CreatedAt, &m.Temperature, &m.Humidity)
 			checkErr(err)
 			dates = append(dates, m.CreatedAt)
 			temperatures = append(temperatures, m.Temperature)
 			humidities = append(humidities, m.Humidity)
-			pressures = append(pressures, m.Pressure)
 		}
 
 		graph := chart.Chart{
@@ -124,6 +122,42 @@ func main() {
 					XValues: dates,
 					YValues: humidities,
 				},
+			},
+		}
+		graph.Elements = []chart.Renderable{
+			chart.LegendThin(&graph),
+		}
+
+		f, _ := os.Create("output.png")
+		defer f.Close()
+		err = graph.Render(chart.PNG, f)
+
+		_, err = c.SendPhotoFile(msg.Chat.ID, "output.png", tbot.OptCaption("Last 24 hours graph"))
+		checkErr(err)
+	})
+
+	bot.HandleMessage("pressure", func(msg *tbot.Message) {
+		c.SendChatAction(msg.Chat.ID, tbot.ActionTyping)
+		rows, err := db.Query("SELECT created_at, pressure FROM measurements WHERE created_at >= datetime('now', '-1 day')")
+		checkErr(err)
+		defer rows.Close()
+		var pressures []float64
+		var dates []time.Time
+		for rows.Next() {
+			m := new(Measurement)
+			err := rows.Scan(&m.CreatedAt, &m.Pressure)
+			checkErr(err)
+			dates = append(dates, m.CreatedAt)
+			pressures = append(pressures, m.Pressure)
+		}
+
+		graph := chart.Chart{
+			XAxis: chart.XAxis{
+				ValueFormatter: func(v interface{}) string {
+					return formatTime(v, "15:04")
+				},
+			},
+			Series: []chart.Series{
 				chart.TimeSeries{
 					Name:    "Pressure",
 					XValues: dates,
