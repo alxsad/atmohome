@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -25,6 +26,8 @@ type Measurement struct {
 	Altitude    float64   `json:"altittude"`
 	Vcc         float64   `json:"vcc"`
 }
+
+var msgSent = false
 
 func main() {
 
@@ -232,6 +235,18 @@ func startAPIServer(db *sql.DB, listen string) {
 		if err != nil {
 			httpErr("Can not insert values into database", 500, w)
 			return
+		}
+		if v < 2900 && !msgSent {
+			msgSent = true
+			go func() {
+				_, _ = http.Post(
+					"http://ntfy.sh/alxsad",
+					"application/x-www-form-urlencoded",
+					bytes.NewBuffer([]byte("🪫atmohome: charge me!🪫")),
+				)
+				time.Sleep(24 * time.Hour)
+				msgSent = false
+			}()
 		}
 		fmt.Fprint(w, "OK")
 	})
